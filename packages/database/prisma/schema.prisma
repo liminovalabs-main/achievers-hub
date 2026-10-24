@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum Role {
+  STUDENT
+  PARENT
+  TUTOR
+  ADMIN
+}
+
+enum FamilyMemberRole {
+  PARENT
+  STUDENT
+}
+
+enum InvitationType {
+  STUDENT_ACCESS
+  TUTOR_ACCESS
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum TutorLinkStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  REVOKED
+}
+
+model User {
+  id                   String                 @id @default(uuid()) @db.Uuid
+  email                String                 @unique
+  passwordHash         String?
+  displayName          String
+  status               UserStatus             @default(ACTIVE)
+  onboardingComplete   Boolean                @default(false)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  roles                RoleAssignment[]
+  parentProfile        ParentProfile?
+  studentProfile       StudentProfile?
+  tutorProfile         TutorProfile?
+  familyMemberships    FamilyMember[]
+  createdInvitations   Invitation[]            @relation("InvitationCreator")
+  acceptedInvitations  Invitation[]            @relation("InvitationAcceptor")
+  approvedTutorLinks   TutorStudentLink[]       @relation("TutorLinkApprover")
+  auditEvents          AuditLog[]               @relation("AuditActor")
+}
+
+model RoleAssignment {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  role      Role
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([role])
+}
+
+model ParentProfile {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StudentProfile {
+  id                String             @id @default(uuid()) @db.Uuid
+  userId            String             @unique @db.Uuid
+  inviteCode        String             @unique
+  currentGrade      String?
+  targetGrade       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tutorLinks        TutorStudentLink[]
+  invitations       Invitation[]
+}
+
+model TutorProfile {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @unique @db.Uuid
+  organisation String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentLinks TutorStudentLink[]
+}
+
+model Family {
+  id          String         @id @default(uuid()) @db.Uuid
+  name        String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  members     FamilyMember[]
+  invitations Invitation[]
+}
+
+model FamilyMember {
+  id        String           @id @default(uuid()) @db.Uuid
+  familyId  String           @db.Uuid
+  userId    String           @db.Uuid
+  role      FamilyMemberRole
+  createdAt DateTime         @default(now())
+  family    Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, userId])
+  @@index([userId, role])
+}
+
+model Invitation {
+  id           String           @id @default(uuid()) @db.Uuid
+  type         InvitationType
+  status       InvitationStatus @default(PENDING)
+  email        String
+  tokenHash    String           @unique
+  familyId     String?          @db.Uuid
+  studentId    String?          @db.Uuid
+  createdById  String           @db.Uuid
+  acceptedById String?          @db.Uuid
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  createdAt    DateTime         @default(now())
+  family       Family?          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  student      StudentProfile?  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy    User             @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  acceptedBy   User?            @relation("InvitationAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([email, status])
+  @@index([familyId])
+  @@index([studentId])
+}
+
+model TutorStudentLink {
+  id                 String          @id @default(uuid()) @db.Uuid
+  tutorId            String          @db.Uuid
+  studentId          String          @db.Uuid
+  status             TutorLinkStatus @default(PENDING)
+  approvedByParentId String?         @db.Uuid
+  approvedAt         DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  tutor              TutorProfile    @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  student            StudentProfile  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  approvedByParent   User?           @relation("TutorLinkApprover", fields: [approvedByParentId], references: [id], onDelete: SetNull)
+
+  @@unique([tutorId, studentId])
+  @@index([studentId, status])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}

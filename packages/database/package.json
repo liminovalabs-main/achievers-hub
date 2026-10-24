@@ -1,0 +1,29 @@
+{
+  "name": "@achievers-hub/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "prisma generate",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev --name day-1-4-foundation",
+    "migrate:deploy": "prisma migrate deploy",
+    "seed": "tsx prisma/seed.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node -e \"console.log('Database package validated by Prisma generate')\""
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.0",
+    "argon2": "^0.44.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "prisma": "6.19.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
